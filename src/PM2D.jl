@@ -1,17 +1,31 @@
 module PM2D
-#=
-# Source2D Type
+#= ------------------------- 2D Panel Method Module ----------------------------
 #   @author: Damyn Chipman
-#   created: 5.17.18
 #
-# =============================================================
+#   This package employs potential flow theory to solve Laplace's equation
+#   around an object such as an airfoil. Solutions to Laplace's equation
+#   include sources, doublets and vortices. These solution elements are
+#   gathered along panels, or discrete lines along the airfoil. By including
+#   the interactions between all other panels, the velocity profile can be
+#   found around the airfoil.
+#
+#
+=#
+
+
+
+# Begin Class Definitions ------------------------------------------------------
+
+
+#===============================================================================
+# Source2D Type
+#
 #   Represents a 2-D Point Source Singularity element
 #
 #   [insert some kind of explanation here]
 #
 #
-# =============================================================
-=#
+# =============================================================================#
 type Source2D
 
     # -- Properties --
@@ -29,25 +43,23 @@ type Source2D
     end
 end
 
-""" --- calc_potential Method ---
+# --- calc_potential Method --
 #
 #
 #
 #
-"""
-function calc_potential(obj::Source2D,coll_point)
+function _calc_potential(obj::Source2D,coll_point)
     # Calculate potential
     obj.potential = (obj.strength/(2*pi))*
                     log(sqrt(norm(obj.elem_loc - coll_point)))
 end
 
-""" --- calc_velocity Method ---
+# -- calc_velocity Method --
 #
 #
 #
 #
-"""
-function calc_velocity(obj::Source2D,coll_point)
+function _calc_velocity(obj::Source2D,coll_point)
     # Initialize velocity vector
     obj.velocity = [0;0]
 
@@ -62,29 +74,25 @@ function calc_velocity(obj::Source2D,coll_point)
                         (obj.elem_loc[2] - coll_point[2])^2))
 end
 
-#=
+#===============================================================================
 # Vortex2D Type
-#   @author: Damyn Chipman
-#   created: 5.17.18
 #
-# =============================================================
 #   Represents a 2-D Point Vortex Singularity element
 #
 #   [insert some kind of explanation here]
 #
 #
-# =============================================================
-=#
+# =============================================================================#
 type Vortex2D
 
-    """Properties"""
+    # -- Properties --
     strength::Array{Float64}
     elem_loc::Array{Float64}
     coll_loc::Array{Float64}
     potential::Float64
     velocity::Array{Float64}
 
-    """Constructor"""
+    # -- Constructor --
     function Vortex2D(strength,elem_loc)
         # Error Handling:
 
@@ -92,26 +100,24 @@ type Vortex2D
     end
 end
 
-""" --- calc_potential Method ---
+# -- calc_potential Method --
 #
 #
 #
 #
-"""
-function calc_potential(obj::Vortex2D,coll_point)
+function _calc_potential(obj::Vortex2D,coll_point)
     # Calculate potential
     obj.potential = -(obj.strength/(2*pi))*
                     (atan((obj.elem_loc[2] - coll_point[2])/
                          (obj.elem_loc[1] - coll_point[1])))
 end
 
-""" --- calc_velocity Method ---
+# -- calc_velocity Method --
 #
 #
 #
 #
-"""
-function calc_velocity(obj::Vortex2D,coll_point)
+function _calc_velocity(obj::Vortex2D,coll_point)
     # Initialize velocity vector
     obj.velocity = [0;0]
 
@@ -124,29 +130,25 @@ function calc_velocity(obj::Vortex2D,coll_point)
                       (norm(obj.elem_loc - coll_point)^2))
 end
 
-#=
+#===============================================================================
 # Doublet2D Type
-#   @author: Damyn Chipman
-#   created: 5.17.18
 #
-# =============================================================
 #   Represents a 2-D Point Doublet Singularity element
 #
 #   [insert some kind of explanation here]
 #
 #
-# =============================================================
-=#
+# =============================================================================#
 type Doublet2D
 
-    """Properties"""
+    # -- Properties --
     strength::Array{Float64}
     elem_loc::Array{Float64}
     coll_loc::Array{Float64}
     potential::Float64
     velocity::Array{Float64}
 
-    """Constructor"""
+    # -- Constructor --
     function Doublet2D(strength,elem_loc)
         # Error Handling:
 
@@ -154,26 +156,24 @@ type Doublet2D
     end
 end
 
-""" --- calc_potential Method ---
+# -- calc_potential Method --
 #
 #
 #
 #
-"""
-function calc_potential(obj::Doublet2D,coll_point)
+function _calc_potential(obj::Doublet2D,coll_point)
     # Calculate potential
     obj.potential = -(1/(2*pi))*
                     ((dot(obj.strength,obj.elem_loc))/
                      (norm(obj.elem_loc - coll_point)))
 end
 
-""" --- calc_velocity Method ---
+# -- calc_velocity Method --
 #
 #
 #
 #
-"""
-function calc_velocity(obj::Doublet2D,coll_point)
+function _calc_velocity(obj::Doublet2D,coll_point)
     # Initialize velocity vector
     obj.velocity = [0;0]
 
@@ -181,47 +181,57 @@ function calc_velocity(obj::Doublet2D,coll_point)
 
 end
 
-"""=========================================================================="""
-#=
+#===============================================================================
 # Panel2D Type
-#   @author: Damyn Chipman
-#   created: 5.23.18
 #
-# =============================================================
 #   Represents a 2-D Panel
 #
 #   [insert some kind of explanation here]
 #
 #
-# =============================================================
-=#
+# =============================================================================#
 type Panel2D
 
-    """Properties"""
-    elem_type
+    # -- Properties --
+    panel_type::String
     start_pt::Array{Float64}
     end_pt::Array{Float64}
+    r0::Array{Float64}
+    rC::Array{Float64}
+    L::Float64
+    theta::Float64
 
-    """Constructor"""
-    function Panel2D(elem_type,start_pt,end_pt)
-        # Error handling:
+    # -- Constructor --
+    function Panel2D(panel_type,start_pt,end_pt)
 
-        new(elem_type,start_pt,end_pt)
+        x1, y1 = start_pt[1], start_pt[2]
+        x2, y2 = end_pt[1], end_pt[2]
+
+        L = sqrt((y2 - y1)^2 + (x2 - x1)^2)
+        theta = atan((y2 - y1)/(x2 - x1))
+
+        x0 = (.25*L*cos(theta)) + x1
+        y0 = (.25*L*sin(theta)) + y1
+        xC = (.75*L*cos(theta)) + x1
+        yC = (.75*L*sin(theta)) + y2
+
+        new(panel_type,start_pt,end_pt,[x0,y0],[xC,yC],L,theta)
+
     end
 end
 
-#=
+# Begin Function Definitions ---------------------------------------------------
+
+#===============================================================================
 # NACA_airfoil Function
 #
-# =============================================================
 #   Creates two lists of ordered pairs representing a NACA Four
 #   digit airfoil
 #
 #   [insert some kind of explanation here]
 #
 #
-# =============================================================
-=#
+# =============================================================================#
 function NACA_airfoil(numb::Int64,c=1)
 
     # Unpackage the digits
@@ -276,8 +286,30 @@ function NACA_airfoil(numb::Int64,c=1)
     return upper,lower
 end
 
+#===============================================================================
+# calc_coeff Function
+#
+#   Given x and y coordinates of an airfoil, calculate the influence
+#   coefficients and reutrn a matrix containing them
+#
+#   [insert some kind of explanation here]
+#
+#
+# =============================================================================#
+function calc_coeff(upper_profile,lower_profile)
+    N_panels = length(upper_profile[1,:]) - 1
+    upper_airfoil = zeros(N_panels)
+    lower_airfoil = zeros(N_panels)
+    println(length(upper_profile))
+    println(length(N_panels))
+    for i=1:(N_panels)
+        upper_airfoil[i] = Panel2D("vortex",upper_profile[i],upper_profile[i+1])
+        lower_airfoil[i] = Panel2D("vortex",lower_profile[i],lower_profile[i+1])
+    end
 
 
+
+end
 
 
 end
