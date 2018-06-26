@@ -63,8 +63,8 @@ type Panel2D
         xC = (.75*L*cos(theta)) + x1
         yC = (.75*L*sin(theta)) + y1
 
-        n_hat = [sin(theta), cos(theta)]
         t_hat = (end_pt - start_pt)/norm(end_pt - start_pt)
+        n_hat = [t_hat[2],-t_hat[1]]
 
         new(start_pt,end_pt,[x0,y0],[xC,yC],L,theta,n_hat,t_hat)
 
@@ -83,19 +83,22 @@ end
 #
 #
 # =============================================================================#
-function NACA_airfoil(numb::Int64,c=1)
+function NACA_airfoil(numb::String,c,N)
 
     # Unpackage the digits
-    m = digits(numb)[4]*.01
-    p = digits(numb)[3]*.1
-    tau = (digits(numb)[2]*10 + digits(numb)[1])*.01
+    m = parse(Int,numb[1])*.01
+    p = parse(Int,numb[2])*.1
+    tau = (parse(Int,numb[3])*10 + parse(Int,numb[4]))*.01
 
     # Define camber geometery
-    x1 = 0:0.01:(p*c)
+    del_x1 = (p*c - 0)/(N/2)
+    del_x2 = (c - p*c)/(N/2)
+
+    x1 = 0:del_x1:(p*c)
     Y1 = ((m)./(p^2)).*(2*p*(x1./c) - (x1./c).^2)
     dY_dx1 = ((2*m)/(p^2)).*(p - x1./c)
 
-    x2 = (p*c):0.01:(c)
+    x2 = (p*c):del_x2:(c)
     Y2 = ((m)./((1 - p)^2)).*((1 - 2*p) + (2*p).*(x2./c) - (x2./c).^2)
     dY_dx2 = ((m)/((1 - p)^2)).*((1 - 2*p) + 2*p.*(x2./c) - (x2./c).^2)
 
@@ -134,6 +137,11 @@ function NACA_airfoil(numb::Int64,c=1)
         lower[i,:] = [x_lower[i],y_lower[i]]
     end
 
+    if m == 0 && p == 0
+        upper[1,:] = [0.0 0.0]
+        lower[1,:] = [0.0 0.0]
+    end
+
     return upper,lower
 end
 
@@ -142,6 +150,9 @@ end
 #
 #   Creates a list of Panel2D objects corresponding to a NACA airfoil with
 #   specified upper and lower coordinates from NACA_airfoil function
+#
+#   Note: upper and lower should "start left and go right", i.e. form
+#         a line beginning with small x values towards larger x values
 #
 #   NACA_panels(upper,lower) -> panels
 #       Inputs:
@@ -204,10 +215,12 @@ function calc_velocity(panel_type::String,str,elem_pt,coll_pt)
         velocity[2] = (str/(2*pi))*((elem_pt[2] - coll_pt[2])/
                     ((elem_pt[1] - coll_pt[1])^2 + (elem_pt[2] - coll_pt[2])^2))
     elseif panel_type == "vortex"
-        velocity[1] = (str/(2*pi))*((elem_pt[2] - coll_pt[2])/
-                                    (norm(elem_pt - coll_pt)^2))
-        velocity[2] = (-str/(2*pi))*((elem_pt[1] - coll_pt[1])/
-                                    (norm(elem_pt - coll_pt)^2))
+        velocity[1] = (str/(2*pi))*((coll_pt[2] - elem_pt[2])/
+                                    ((coll_pt[1] - elem_pt[1])^2 +
+                                     (coll_pt[2] - elem_pt[2])^2))
+        velocity[2] = (-str/(2*pi))*((coll_pt[1] - elem_pt[1])/
+                                    ((coll_pt[1] - elem_pt[1])^2 +
+                                     (coll_pt[2] - elem_pt[2])^2))
     elseif panel_type == "doublet"
         error("Still in development")
     else
@@ -226,7 +239,8 @@ end
 #
 #   calc_strengths(f_vel,panels,u_inf,doKutta) -> strengths
 #       Inputs:
-#       f_vel - callable velocity vector function. Should return a vector.
+#       f_vel - callable velocity vector function. Should return a vector and be
+#               of the form f(r,r0) where r0 is the location of the element
 #       panels - list of Panel2D objects corresponding to the locations of
 #                panels
 #       u_inf - Operation condition for the free stream velocity
@@ -241,7 +255,7 @@ function calc_strengths(f_vel,panels,u_inf,doKutta)
     A = Array{Float64}(N_panels,N_panels)
     for i=1:N_panels
         for j=1:N_panels
-            A[i,j] = dot(f_vel(panels[i].r0,panels[j].rC),panels[i].n_hat)
+            A[j,i] = dot(f_vel(panels[i].r0,panels[j].rC),panels[i].n_hat)
         end
     end
 
@@ -250,9 +264,7 @@ function calc_strengths(f_vel,panels,u_inf,doKutta)
         b[i] = -dot(u_inf,panels[i].n_hat)
     end
 
-    if doKutta == true
-        # Implement the Kutta Condition
-
+    if doKutta
         kutta = Array{Float64}(N_panels)
         for j=1:N_panels
             kutta[j] = dot(f_vel(panels[1].r0,panels[j].rC),panels[1].t_hat) +
@@ -260,11 +272,12 @@ function calc_strengths(f_vel,panels,u_inf,doKutta)
         end
         A[2,:] = kutta
         b[2] = 0.0
-        strengths = b\A
+        strengths = A\b
     else
-        strengths = b\A
+        strengths = A\b
     end
-    return strengths
+    return strengths,A,b
 end
 
+#=============================== END OF MODULE ================================#
 end
