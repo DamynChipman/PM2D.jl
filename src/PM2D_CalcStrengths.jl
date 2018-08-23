@@ -1,27 +1,21 @@
-#===============================================================================
-# CalcStrengths Function
-#
-#   Given a list of Panel2D objects and the operation conditions (i.e. u_inf),
-#   calculates the strengths of the elements. Implements the Kutta Condition
-#   using a distribution of source and vortex elements. Solves using A\b
-#   notation.
-#
-#   CalcStrengths(f_vel,panels,u_inf,doKutta) -> A,b,strengths
-#       Inputs:
-#       panels::Array{Panel2D} - list of Panel2D objects corresponding to the
-#                                locations of panels
-#       oper_cond::Array{Float64} - Operation conditions = {U_INF, AoA}
-#       check_BC::Bool - Optional argument to print the values of the boundary
-#                        conditions (tanget flow and Kutta condition)
-#       method::String - Method for element distribution. Options are: "panels",
-#                        "HansSmith". Defaults to "panels"
-#
-#       Outputs:
-#       A - coefficient matrix
-#       b - RHS vector
-#       strengths - list of strengths corresponding to the strengths of the
-#                   elements
-# =============================================================================#
+"""
+    `CalcStrengths(panels,oper_cond)`
+
+Given a list of Panel2D objects and the operation conditions, calculates the
+strengths of the elements. Implements a Hans-Smith panel method. The Hans-Smith
+method uses a distribution of constant strength source panels with varying
+strengths for each panel and a constant strength vortex distribution across
+the entire body. This allows for easy implementation of the Kutta Condition.
+
+# ARGUMENTS
+* `panels::Array{Panel2D}`       : Array of Panel2D objects representing a body
+* `oper_cond::Array{Float64}`    : Operation conditions, [U_INF,ALPHA]
+
+# OUTPUTS
+* `A::Array{Float64}`            : Coefficient matrix, size: (N+1)x(N+1)
+* `b::Array{Float64}`            : RHS vector
+* `strengths::Array{Float64}`    : Array of element strengths
+"""
 function CalcStrengths(panels::Array{Panel2D},
                        oper_cond::Array{Float64})
 
@@ -32,27 +26,25 @@ function CalcStrengths(panels::Array{Panel2D},
     A = zeros(NPAN+1,NPAN+1)
     b = zeros(NPAN+1)
 
-    unit_str = 1.0
-
     # Tangent Flow Conditions
     for i=1:NPAN
         n_hat_pan = panels[i].n_hat
         for j=1:NPAN
-            u_pan = CalcVelocity(panels[i],
-                                 panels[j].rC,
+            u_pan = CalcVelocity(panels[j],
+                                 panels[i].rC,
                                  unit_str,
                                  "source")
-            A[j,i] = dot(u_pan,n_hat_pan)
+            A[i,j] = dot(u_pan,n_hat_pan)
         end
 
         u_vor = [0.0, 0.0]
         for j=1:NPAN
-            u_vor = u_vor + CalcVelocity(panels[i],
-                                         panels[j].rC,
+            u_vor = u_vor + CalcVelocity(panels[j],
+                                         panels[i].rC,
                                          unit_str,
                                          "vortex")
         end
-        A[NPAN+1,i] = dot(u_vor,n_hat_pan)
+        A[i,NPAN+1] = dot(u_vor,n_hat_pan)
     end
 
     # Kutta Condition
@@ -67,7 +59,7 @@ function CalcStrengths(panels::Array{Panel2D},
                                panels[NPAN].rC,
                                unit_str,
                                "source")
-        A[j,NPAN+1] = dot(u_pan_1,t_hat_1) + dot(u_pan_N,t_hat_N)
+        A[NPAN+1,j] = dot(u_pan_1,t_hat_1) + dot(u_pan_N,t_hat_N)
     end
 
     u_vor_1 = [0.0, 0.0]
@@ -86,13 +78,14 @@ function CalcStrengths(panels::Array{Panel2D},
 
     # RHS Vector
     for i=1:NPAN
-        b[i] = dot(u_inf,panels[i].n_hat)
+        b[i] = -dot(u_inf,panels[i].n_hat)
     end
 
-    b[NPAN+1] = dot(u_inf,t_hat_1) + dot(u_inf,t_hat_N)
+    b[NPAN+1] = -(dot(u_inf,t_hat_1) + dot(u_inf,t_hat_N))
 
-    # --- Strengths Vector ---
-    strengths = transpose(A)\b
+
+    # Strengths Vector
+    strengths = A\b
 
     return A,b,strengths
 end

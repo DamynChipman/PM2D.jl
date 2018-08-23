@@ -1,11 +1,19 @@
-#===============================================================================
-# CalcVelocity Function
-#
-#
-#
-#
-#
-# =============================================================================#
+"""
+    `CalcVelocity(elem_panel,eval_pt,str,panel_type)`
+
+Computes the induced velocity from the element panel. Uses a constant strength
+distribution of either source, vortex, or doublet panels. Used as the velocity
+kernal for the panel method by allowing the strength to be of unit magnitude.
+
+# ARGUMENTS
+* `elem_panel::Panel2D`         : Panel2D object of the element panel
+* `eval_pt::Array{Float64}`     : Point where the velocity field is evaluated
+* `str::Float64`                : Element strength
+* `panel_type::String`          : Type of panel ("source", "vortex", "doublet")
+
+# OUTPUTS
+* `velocity::Array{Float64}`    : Vector of velocity [Vx,Vy]
+"""
 function CalcVelocity(elem_panel::Panel2D,
                       eval_pt::Array{Float64},
                       str::Float64,

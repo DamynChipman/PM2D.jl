@@ -1,22 +1,13 @@
 """
     `NACA_airfoil(numb, N, c)`
 
-This is my amazing function!
+NACA Four-Digit Series Airfoil. Returns two lists of ordered pairs representing
+a NACA Four-Digit Airfoil.
 
 # ARGUMENTS
-* `numb::String`     : Just a random number.
-* `N::Int64`         : Just follow your heart.
-
-===============================================================================
-NACA_airfoil Function
-
-  Creates two lists of ordered pairs representing a NACA Four
-  digit airfoil
-
-  [insert some kind of explanation here]
-
-
-=============================================================================#
+* `numb::String`     : Four digit series. Symmetric airfoil given by "00xx"
+* `N::Int64`         : Number of points
+* `c::Float64=1.0`   : Length of airfoil. Defaults to 1.0 for appropiate scaling
 """
 function NACA_airfoil(numb::String,
                       N::Int64,
@@ -150,20 +141,29 @@ function NACA_camber(camber::Array{Float64},
     return panels
 end
 
-#===============================================================================
-# NACA_body Function
-#
-#
-#   [insert some kind of explanation here]
-#
-#   NOTE: Must be a closed body
-# =============================================================================#
+"""
+    `NACA_body(X,Y,orientation,r0_location,rC_location,rC_offset,refine_TE)`
+
+Creates an array of Panel2D objects based on a closed body given by a set of
+X and Y points. Can be in either clockwise of counterclockwise orientations but
+must be a closed, continuous body.
+
+# ARGUMENTS
+* `X::Array{Float64}`           : List of X body points
+* `Y::Array{Float64}`           : List of Y body points
+* `orientation::String="CCW"`   : Panel orientation; either "CCW" or "CW"
+* `rC_location::Float64=0.5`    : Location along panel (between 0 and 1) of collocation point
+* `rC_offset::Float64=0.01`     : Offset of collocation point from panel in direction of normal vector
+* `refine_TE::Bool=false`       : Option to place collocation points of trailing edges closer to trailing edge
+
+# OUTPUTS
+* `panels::Array{Panel2D}`      : Array of Panel2D objects representing a body
+"""
 function NACA_body(X::Array{Float64},
-                   Y::Array{Float64},
+                   Y::Array{Float64};
                    orientation::String="CCW",
-                   r0_location::Float64=0.1,
                    rC_location::Float64=0.5,
-                   rC_offset::Float64=0.01,
+                   rC_offset::Float64=1e-4,
                    refine_TE=false)
 
     # Iterate around surface to create panels
@@ -179,11 +179,15 @@ function NACA_body(X::Array{Float64},
             end
             r1 = [X[n];Y[n]]
             r2 = [X[n+1];Y[n+1]]
-            panels[n] = Panel2D(r1,r2,r0_location,rC_location,rC_offset,orientation)
+            panels[n] = Panel2D(r1,r2,rC_location=rC_location,
+                                      rC_offset=rC_offset,
+                                      orientation=orientation)
         else
             r1 = [X[n];Y[n]]
             r2 = [X[n+1];Y[n+1]]
-            panels[n] = Panel2D(r1,r2,r0_location,rC_location,rC_offset,orientation)
+            panels[n] = Panel2D(r1,r2,rC_location=rC_location,
+                                      rC_offset=rC_offset,
+                                      orientation=orientation)
         end
     end
     return panels
