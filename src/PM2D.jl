@@ -1,16 +1,21 @@
-#=========================== 2D Panel Method Module ============================
-#   HEADER FILE
-#
-#   @author: Damyn Chipman
-#
-#   Employs potential flow theory to solve Laplace's equation
-#   around an object such as an airfoil. Solutions to Laplace's equation
-#   include sources, doublets and vortices. These solution elements are
-#   gathered along panels, or discrete lines along the airfoil. By including
-#   the interactions between all other panels, the velocity profile can be
-#   found around the airfoil.
-#
-=#
+"""
+=========================== 2D PANEL METHOD ====================================
+HEADER FILE
+
+@author: Damyn Chipman
+
+PM2D is a 2D Panel Method package. The panel method employs potential flow
+theory to solve for element strengths of singularity elements distributed along
+a body (such as an airfoil). The tangent flow boundary conditions are imposed
+on collocation points distributed along the body. A physical Kutta condition is
+also imposed to ensure that the airflow at the trailing edges leaves smoothly.
+
+The Hans-Smith method for element distribution is used. The body has a constant
+source distribution with varying strengths at each panel as well as a constant
+vortex distribution with a single vortex strength for each panel. This allows
+for easy implementation of the Kutta condition by introducing one more unknown
+strength to solve for than panels.
+"""
 module PM2D
 
 # Imports ======================================================================
@@ -31,19 +36,18 @@ end
 
 # Helper Functions =============================================================
 
-#===============================================================================
-# unpack_oper_cond Function
-#
-#   Function to unpack operation conditions and return a vector for the free-
-#   stream velocity in the global reference frame.
-#
-#   unpack_oper_cond(oper_cond) -> u_inf
-#       Inputs:
-#       oper_cond - operation conditions = [U_INF,AoA]
-#
-#       Outputs:
-#       u_inf - vector of free-stream velocity
-# =============================================================================#
+"""
+    `unpack_oper_cond(oper_cond)`
+
+Function to unpack operation conditions and return a vector for the free-
+stream velocity in the global reference frame.
+
+# ARGUMENTS
+* `oper_cond::Array{Float64}`     : Operation conditions, [U_INF,ALPHA]
+
+# OUTPUTS
+* `u_inf::Array{Float64}`         : Vector of free stream velocity in global frame
+"""
 function unpack_oper_cond(oper_cond)
     U_INF = oper_cond[1]
     AoA = oper_cond[2]
@@ -52,18 +56,17 @@ function unpack_oper_cond(oper_cond)
     return u_inf
 end
 
-#===============================================================================
-# array_to_matrix Function
-#
-#   Converts a m-by-n array into an m element array of arrays (matrix)
-#
-#   array_to_matrix(array) -> matrix
-#       Inputs:
-#       array - m-by-n array
-#
-#       Outputs:
-#       matrix - m element array of arrays (matrix)
-# =============================================================================#
+"""
+    `array_to_matrix(array)`
+
+Converts a m-by-n array into an m element array of arrays (matrix)
+
+# ARGUMENTS
+* `array::Array`         : MxN array
+
+# OUTPUTS
+* `matrix::Array{Array}` : M element array of arrays (matrix)
+"""
 function array_to_matrix(array)
     matrix = [array[1,:]]
     for n=2:length(array[:,1])
@@ -72,18 +75,6 @@ function array_to_matrix(array)
     return matrix
 end
 
-#===============================================================================
-# read_dat_file Function
-#
-#   Reads a .dat or .txt file of airfoil data from airfoiltools.com in "selig"
-#   data format (CCW orientation starting at UTE)
-#
-#   read_dat_file() ->
-#       Inputs:
-#
-#       Outputs:
-#
-# =============================================================================#
 function readcontour(file_name; header_len=1, delim=" ", path="",
                       output="arrays")
   x, y = Float64[], Float64[]
@@ -114,39 +105,74 @@ function readcontour(file_name; header_len=1, delim=" ", path="",
   end
 end
 
-#===============================================================================
-# PanelMethod Function
-#
-#   Wrapper function for the default options for the implemented panel method.
-#   Takes a matrix of points outlining the body in a counter-clockwise
-#   orientation of the form:
-#   XY = [[X1, Y1],
-#         [X2, Y2],
-#         [...],
-#         [XN, YN]]
-#   as well as the operation conditions.
-#   Returns a vector of strengths corresponding to the strengths of the elements
-#   for each panel.
-#
-#   PanelMethod(XY,oper_cond) -> strengths
-#       Inputs:
-#       XY - matrix of points outlining body in CCW orientation
-#       oper_cond - operation conditions = [U_INF,AoA]
-#
-#       Outputs:
-#       strengths - list of strengths corresponding to the strengths of the
-#                   elements
-# =============================================================================#
-function PanelMethod(XY,oper_cond)
-    X = zeros(length(XY))
-    Y = zeros(length(XY))
-    for n=1:length(XY)
-        X[n] = XY[n][1]
-        Y[n] = XY[n][2]
+"""
+    `PanelMethod(X_body,Y_body,oper_cond,outputs)`
+
+Wrapper function for the panel method implemented by PM2D. Performs the panel method
+with the default options. These options are:
+
+rC_location = 0.5 : Collocation points location on panels
+rC_offset = 1e-4  : Offset from panel in normal direction
+refine_TE = false : Option to refine collocation points on trailing edges
+
+# ARGUMENTS
+* `X_body::Array{Float64}`         : X coordinates of body in counterclockwise direction
+* `Y_body::Array{Float64}`         : Y coordinates of body in counterclockwise direction
+* `oper_cond::Array{Float64}`      : Operation conditions, [U_INF,ALPHA]
+* `outputs::Array{String}`         : Options for outputs of panel method. Options include: "Panels", "Coef Matrix", "RHS Vector", "Strengths", "Pres Coef", "Lift Coef"
+"""
+function PanelMethod(X_body::Array{Float64},Y_body::Array{Float64},
+                     oper_cond::Array{Float64},
+                     outputs::Array{String})
+
+    to_return = []
+    options = ["Panels","Coef Matrix","RHS Vector","Strengths","Pres Coef","Lift Coef"]
+    for out in outputs
+        if out == options[1]
+
+            panels = NACA_body(X_body,Y_body)
+            push!(to_return,panels)
+
+        elseif out == options[2]
+
+            panels = NACA_body(X_body,Y_body)
+            A,b,strengths = CalcStrengths(panels,oper_cond)
+            push!(to_return,A)
+
+        elseif out == options[3]
+
+            panels = NACA_body(X_body,Y_body)
+            A,b,strengths = CalcStrengths(panels,oper_cond)
+            push!(to_return,b)
+
+        elseif out == options[4]
+
+            panels = NACA_body(X_body,Y_body)
+            A,b,strengths = CalcStrengths(panels,oper_cond)
+            push!(to_return,strengths)
+
+        elseif out == options[5]
+
+            panels = NACA_body(X_body,Y_body)
+            A,b,strengths = CalcStrengths(panels,oper_cond)
+            Cp,rC = CalcCp(panels,strengths,oper_cond)
+            push!(to_return,[Cp,rC])
+
+        elseif out == options[6]
+
+            panels = NACA_body(X_body,Y_body)
+            A,b,strengths = CalcStrengths(panels,oper_cond)
+            Cl = CalcCl(panels,strengths,oper_cond)
+            push!(to_return,Cl)
+
+        else
+
+            error("Invalid output option for PanelMethod. See ? for options.")
+
+        end
     end
-    panels = NACA_body(X,Y)
-    A,b,strengths = CalcStrengths(panels,oper_cond)
-    return strengths,panels
+
+    return to_return
 end
 
 #=============================== END OF MODULE ================================#
