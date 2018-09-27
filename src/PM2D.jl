@@ -24,13 +24,9 @@ module PM2D
 const DEG2RAD = pi/180
 
 # Headers ======================================================================
-for header_name in ["Panel2D",
-                    "CalcVelocity",
-                    "CalcStrengths",
-                    "InducedVelocity",
-                    "NACA",
-                    "Coefs"]
-
+files = ["Panel2D","CalcVelocity","CalcStrengths",
+         "InducedVelocity","NACA","Coefs","BoundaryLayer"]
+for header_name in files
     include("PM2D_"*header_name*".jl")
 end
 
@@ -125,42 +121,38 @@ function PanelMethod(X_body::Array{Float64},Y_body::Array{Float64},
                      oper_cond::Array{Float64},
                      outputs::Array{String})
 
+    panels = NACA_body(X_body,Y_body)
+
     to_return = []
     options = ["Panels","Coef Matrix","RHS Vector","Strengths","Pres Coef","Lift Coef"]
     for out in outputs
         if out == options[1]
 
-            panels = NACA_body(X_body,Y_body)
             push!(to_return,panels)
 
         elseif out == options[2]
 
-            panels = NACA_body(X_body,Y_body)
             A,b,strengths = CalcStrengths(panels,oper_cond)
             push!(to_return,A)
 
         elseif out == options[3]
 
-            panels = NACA_body(X_body,Y_body)
             A,b,strengths = CalcStrengths(panels,oper_cond)
             push!(to_return,b)
 
         elseif out == options[4]
 
-            panels = NACA_body(X_body,Y_body)
             A,b,strengths = CalcStrengths(panels,oper_cond)
             push!(to_return,strengths)
 
         elseif out == options[5]
 
-            panels = NACA_body(X_body,Y_body)
             A,b,strengths = CalcStrengths(panels,oper_cond)
             Cp,rC = CalcCp(panels,strengths,oper_cond)
             push!(to_return,[Cp,rC])
 
         elseif out == options[6]
 
-            panels = NACA_body(X_body,Y_body)
             A,b,strengths = CalcStrengths(panels,oper_cond)
             Cl = CalcCl(panels,strengths,oper_cond)
             push!(to_return,Cl)
