@@ -14,23 +14,37 @@ Uses a Hess-Smith style of element distribution.
 """
 function InducedVelocity(panels::Array{Panel2D},
                          strengths::Array{Float64},
-                         R::Array{Float64})
+                         R::Array{Float64},
+                         method::String)
 
     # Unpacking
     NPAN = length(panels)
 
     u_ind = [0.0,0.0]
 
-    for j=1:NPAN
-        u_ind = u_ind + CalcVelocity(panels[j],
-                                     R,
-                                     strengths[j],
-                                     "source") +
-                         CalcVelocity(panels[j],
-                                      R,
-                                      strengths[NPAN+1],
-                                      "vortex")
+    if method == "Hess-Smith"
+        for j=1:NPAN
+            u_ind = u_ind + CalcVelocity(panels[j],
+                                         R,
+                                         strengths[j],
+                                         "source") +
+                             CalcVelocity(panels[j],
+                                          R,
+                                          strengths[NPAN+1],
+                                          "vortex")
+        end
+    elseif method == "Vortex Sheet"
+        for j=1:NPAN
+            u_ind = u_ind + CalcVelocity(panels[j],
+                                         R,
+                                         strengths[j],
+                                         "vortex")
+        end
+
+    else
+        error("Invalid 'method' in InducedVelocity.")
     end
+
     return u_ind
 end
 
@@ -49,7 +63,8 @@ Calculates the velocity at each collocation of the body of panels
 """
 function VelocityProfile(panels::Array{Panel2D},
                          strengths::Array{Float64},
-                         oper_cond::Array{Float64})
+                         oper_cond::Array{Float64},
+                         method::String)
 
     # Unpacking
     u_inf = unpack_oper_cond(oper_cond)
@@ -57,10 +72,20 @@ function VelocityProfile(panels::Array{Panel2D},
 
     u_panels = zeros(NPAN,2)
 
-    for j=1:NPAN
-        u_panels[j,:] = u_inf + InducedVelocity(panels,
-                                                strengths,
-                                                panels[j].rC)
+    if method == "Hess-Smith"
+        for j=1:NPAN
+            u_panels[j,:] = u_inf + InducedVelocity(panels,
+                                                    strengths,
+                                                    panels[j].rC)
+        end
+    elseif method == "Vortex Sheet"
+        for j=1:NPAN
+            u_panels[j,:] = u_inf + InducedVelocity(panels,
+                                                    strengths,
+                                                    panels[j].rC)
+        end
+    else
+        error("Invalid 'method' in InducedVelocity.")
     end
 
     return u_panels

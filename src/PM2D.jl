@@ -14,18 +14,19 @@ The Hans-Smith method for element distribution is used. The body has a constant
 source distribution with varying strengths at each panel as well as a constant
 vortex distribution with a single vortex strength for each panel. This allows
 for easy implementation of the Kutta condition by introducing one more unknown
-strength to solve for than panels.
+strength to solve for then panels.
 """
 module PM2D
 
 # Imports ======================================================================
+using QuadGK
 
 # Global Variables =============================================================
 const DEG2RAD = pi/180
 
 # Headers ======================================================================
 files = ["Panel2D","CalcVelocity","CalcStrengths",
-         "InducedVelocity","NACA","Coefs","BoundaryLayer"]
+         "InducedVelocity","NACA","Coefs","BoundaryLayer","CalcVortexSheet"]
 for header_name in files
     include("PM2D_"*header_name*".jl")
 end
@@ -42,7 +43,8 @@ stream velocity in the global reference frame.
 * `oper_cond::Array{Float64}`     : Operation conditions, [U_INF,ALPHA]
 
 # OUTPUTS
-* `u_inf::Array{Float64}`         : Vector of free stream velocity in global frame
+* `u_inf::Array{Float64}`         : Vector of free stream velocity in
+                                    global frame
 """
 function unpack_oper_cond(oper_cond)
     U_INF = oper_cond[1]
@@ -104,27 +106,38 @@ end
 """
     `PanelMethod(X_body,Y_body,oper_cond,outputs)`
 
-Wrapper function for the panel method implemented by PM2D. Performs the panel method
-with the default options. These options are:
+Wrapper function for the panel method implemented by PM2D. Performs the panel
+method with the default options. These options are:
 
 rC_location = 0.5 : Collocation points location on panels
 rC_offset = 1e-4  : Offset from panel in normal direction
 refine_TE = false : Option to refine collocation points on trailing edges
 
 # ARGUMENTS
-* `X_body::Array{Float64}`         : X coordinates of body in counterclockwise direction
-* `Y_body::Array{Float64}`         : Y coordinates of body in counterclockwise direction
+* `X_body::Array{Float64}`         : X coordinates of body in CCW direction
+* `Y_body::Array{Float64}`         : Y coordinates of body in CCW direction
 * `oper_cond::Array{Float64}`      : Operation conditions, [U_INF,ALPHA]
-* `outputs::Array{String}`         : Options for outputs of panel method. Options include: "Panels", "Coef Matrix", "RHS Vector", "Strengths", "Pres Coef", "Lift Coef"
+* `outputs::Array{String}`         : Options for outputs of panel method.
+                                     Options include:
+                                     "Panels", "Coef Matrix", "RHS Vector",
+                                     "Strengths", "Pres Coef", "Lift Coef"
 """
 function PanelMethod(X_body::Array{Float64},Y_body::Array{Float64},
                      oper_cond::Array{Float64},
-                     outputs::Array{String})
+                     outputs::Array{String},
+                     method::String="Hess-Smith")
 
     panels = NACA_body(X_body,Y_body)
+    NPAN = length(panels)
 
     to_return = []
-    options = ["Panels","Coef Matrix","RHS Vector","Strengths","Pres Coef","Lift Coef"]
+    options = ["Panels",
+               "Coef Matrix",
+               "RHS Vector",
+               "Strengths",
+               "Pres Coef",
+               "Lift Coef",
+               "Vortex Sheet"]
     for out in outputs
         if out == options[1]
 
@@ -156,6 +169,15 @@ function PanelMethod(X_body::Array{Float64},Y_body::Array{Float64},
             A,b,strengths = CalcStrengths(panels,oper_cond)
             Cl = CalcCl(panels,strengths,oper_cond)
             push!(to_return,Cl)
+
+        elseif out == options[7]
+            #println("In here")
+
+            RHS = zeros(NPAN-1)
+            for i=1:NPAN-1
+                RHS[i] = dot(2,panels[i].t_hat,1,unpack_oper_cond(oper_cond),1)
+            end
+            push!(to_return,CalcVortexSheetCoef(panels,RHS))
 
         else
 
