@@ -28,7 +28,6 @@ function CalcCp(panels::Array{Panel2D},
         eval_pt = panels[n].rC-(factor*rC_off).*panels[n].n_hat
         u_ind = InducedVelocity(panels,
                                 strengths,
-                                oper_cond,
                                 eval_pt)
         u_tan = dot(u_ind + u_inf,panels[n].t_hat)
         Cp[n] = 1 - (u_tan/U_INF)^2

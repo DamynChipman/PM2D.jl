@@ -46,14 +46,6 @@ type Panel2D
 
         t_hat = (r2 - r1)/norm(r2 - r1)
         n_hat = [t_hat[2],-t_hat[1]]
-        # if orientation == "CW"
-        #     n_hat = [t_hat[2],-t_hat[1]]
-        # elseif orientation == "CCW"
-        #     n_hat = [t_hat[2],-t_hat[1]]
-        # else
-        #     options = ["CCW, ","CW"]
-        #     error("Invalid orientation for Panel2D. Options are: "*options)
-        # end
 
         xC = (rC_location*L*cos(theta)) + x1 + rC_offset*n_hat[1]
         yC = (rC_location*L*sin(theta)) + y1 + rC_offset*n_hat[2]
