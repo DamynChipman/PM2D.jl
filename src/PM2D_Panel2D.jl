@@ -19,7 +19,7 @@ Object representing the geometry of a 2D panel. Points are in a global reference
 * `n_hat::Array{Float64}`     : Normal vector
 * `t_hat::Array{Float64}`     : Tangent vector
 """
-abstract type Panel2D
+mutable struct Panel2D
 
     # -- Properties --
     r1::Array{Float64}
