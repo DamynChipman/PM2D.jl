@@ -60,7 +60,7 @@ function NACA_airfoil(numb::String,
     T(x) = 5*tau*(0.2969*x^.5 - 0.1260*x - 0.3516*x^2 + 0.2843*x^3 - 0.1015*x^4)
 
     # Determine x and y coordinates of airfoil surface
-    x_upper, x_lower, y_upper, y_lower = 0.*x, 0.*x, 0.*x, 0.*x
+    x_upper, x_lower, y_upper, y_lower = 0. * x, 0. * x, 0. * x, 0. * x
     for i=1:length(x)
         theta = atan(dY_dx[i])
 
